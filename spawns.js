@@ -31,8 +31,14 @@ var container = {
         spawn.memory.spid = Memory.module.spawns.spawn_id;
         Memory.module.spawns.spawn_id++;
         Memory.module.spawns.spawns[spawn.memory.spid] = spawn.id;
-        spawn.memory.creep_count = 0;
-        spawn.memory.target_creep_count = properties.spawns.default_creep_count;
+        spawn.memory.creep_count = {};
+        spawn.memory.target_creep_count = {};
+        for (var rolename in script_screeps.roles) {
+            var role = script_screeps.roles[rolename];
+            console.log(role);
+            spawn.memory.creep_count[role] = 0;
+            spawn.memory.target_creep_count[role] = properties.spawns.default_creep_count[role];
+        }
 
         var sources = spawn.room.find(FIND_SOURCES);
         var mod_source = Memory.module.sources.sources;
@@ -57,26 +63,45 @@ var container = {
 
         for (var spid in Memory.module.spawns.spawns) {
             var spawn = Game.getObjectById(Memory.module.spawns.spawns[spid]);
+            let cannotspawn = spawn.spawning;
             
             if (!spawn) {
                 console.log("Spawn no longer exists");
                 delete Memory.module.spawns.spawns[spid];
             } else {
                 //console.log("PROCESSING SPAWN " + spawn.name);
-                if (spawn.memory.creep_count < spawn.memory.target_creep_count && !spawn.spawning) {
-                    console.log("WANTING TO CREATE CREEP");
-                    var workers = script_screeps[script_screeps.roles.worker];
-                    var cancreate = spawn.spawnCreep(workers.body,"TEST",{dryRun: true});
-                    if (cancreate == OK && spawn.memory.source_count > 0) {
-                        console.log("SPAWNING CREEP");
+                for (var rolename in script_screeps.roles) {
+                    var rolestr = script_screeps.roles[rolename];
+                    var role = script_screeps[rolestr];
+                    //console.log("Checking role " + rolestr + " -- " + role);
+                    if (spawn.memory.creep_count[rolestr] < spawn.memory.target_creep_count[rolestr] && !cannotspawn) {
+                        console.log("WANTING TO CREATE " + rolestr);
                         
-                        var target_source = Game.getObjectById(get_least_exploited_source(spawn));
-
-                        
-
-                        if (spawn.spawnCreep(workers.body, workers.get_name(), {memory: workers.create(spawn, target_source)}) == OK) {
-                            spawn.memory.creep_count++;
-                            Memory.module.sources.sources[target_source.id].exploiters++;
+                        var cancreate = spawn.spawnCreep(role.body,"TEST",{dryRun: true});
+                        if (cancreate == OK) {
+                            console.log("RESOURCES OK");
+                            
+                            switch(rolestr) {
+                                case script_screeps.roles.worker:
+                                    if (spawn.memory.source_count > 0) {
+                                        var target_source = Game.getObjectById(get_least_exploited_source(spawn));
+                                        
+                                        if (spawn.spawnCreep(role.body, role.get_name(), {memory: role.create(spawn, target_source)}) == OK) {
+                                            spawn.memory.creep_count[rolestr]++;
+                                            Memory.module.sources.sources[target_source.id].exploiters++;
+                                            cannotspawn = true;
+                                        }
+                                    }
+                                    break;
+                                case script_screeps.roles.upgrader:
+                                    if (spawn.spawnCreep(role.body, role.get_name(), {memory: role.create(spawn, spawn.room.controller)}) == OK) {
+                                            spawn.memory.creep_count[rolestr]++;
+                                            cannotspawn = true;
+                                        }
+                                    break;
+                                default:
+                                    console.log("UNKOWN ROLE!");
+                            }
                         }
                     }
                 }

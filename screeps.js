@@ -32,7 +32,8 @@ function worker_tick(creep) {
 
 
 var roles = {
-    worker: "WORKER"
+    worker: "WORKER",
+    upgrader: "UPGRADER"
 }
 
 var container = {
@@ -59,9 +60,60 @@ var container = {
             return creepmem;
         },
 
-        do_tick: worker_tick,
+        do_tick: function (creep) {
+            var home = Game.getObjectById(creep.memory.home);
+            var target = Game.getObjectById(creep.memory.target);
+        
+            if(creep.carry.energy < creep.carryCapacity) {
+                if(creep.harvest(target) == ERR_NOT_IN_RANGE) {
+                    creep.moveTo(target);
+                }
+            }
+            else {
+                if(creep.transfer(home, RESOURCE_ENERGY) == ERR_NOT_IN_RANGE) {
+                    creep.moveTo(home);
+                }
+            }
+                
+        },
 
-        get_name: function() {return "CREEP_" + Memory.module.screeps.creep_id + "_" + get_random_from_list(NAMES)},
+        get_name: function() {return roles.worker + "_" + Memory.module.screeps.creep_id + "_" + get_random_from_list(NAMES)},
+
+        body: [MOVE, CARRY, WORK]
+
+
+
+    },
+    
+    "UPGRADER": {
+
+        create: function (home, target) {
+            var creepmem = {};
+            general_create(creepmem);
+            creepmem.home = home.id;
+            creepmem.target = target.id;
+            creepmem.role = roles.upgrader;
+            return creepmem;
+        },
+
+        do_tick: function (creep) {
+            var home = Game.getObjectById(creep.memory.home);
+            var target = Game.getObjectById(creep.memory.target);
+        
+            if(creep.carry.energy == 0 && home.energy > 0) {
+                if(creep.withdraw(home, RESOURCE_ENERGY) == ERR_NOT_IN_RANGE) {
+                    creep.moveTo(home);
+                }
+            }
+            else if (creep.carry.energy != 0) {
+                if(creep.upgradeController(target) == ERR_NOT_IN_RANGE) {
+                    creep.moveTo(target);
+                }
+            }
+            
+        },
+
+        get_name: function() {return roles.upgrader + "_" + Memory.module.screeps.creep_id + "_" + get_random_from_list(NAMES)},
 
         body: [MOVE, CARRY, WORK]
 
@@ -88,8 +140,17 @@ function do_ticks() {
         //console.log("PROCESSING CREEP " + creep.name);
         if (!creep) {
             console.log("Creep does not exist!");
-            Game.getObjectById(Memory.creeps[Memory.module.screeps.creep_map[crid]].home).memory.creep_count--;
-            Memory.module.sources.sources[Memory.creeps[Memory.module.screeps.creep_map[crid]].target].exploiters--;
+            var memcreep = Memory.creeps[Memory.module.screeps.creep_map[crid]];
+            var homespawn = Game.getObjectById(memcreep.home)
+            homespawn.memory.creep_count[memcreep.role]--;
+            switch (memcreep.role) {
+                case roles.worker:
+                    Memory.module.sources.sources[memcreep.target].exploiters--;
+                    break;
+                default:
+                    break;
+            }
+            
             delete Memory.creeps[Memory.module.screeps.creep_map[crid]];
             delete Memory.module.screeps.creep_map[crid];
             

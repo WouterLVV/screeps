@@ -9,6 +9,8 @@ module.exports.loop = function () {
         Memory.module = {};
     }
     
+    //return;
+    
     //console.log("INITS...")
 	// inits
 	properties.init();
